@@ -77,24 +77,27 @@ export default function EditorPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {templates.map((template: any) => (
             <button
               key={template._id}
               onClick={() => setSelectedTemplate(template)}
-              className="group relative overflow-hidden rounded-lg border border-border hover:shadow-lg transition-all"
+              className="group relative overflow-hidden rounded-xl border-2 border-border hover:border-primary/50 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1"
             >
-              <div className="aspect-square w-full bg-muted">
+              <div className="aspect-square w-full bg-gradient-to-br from-muted to-muted/50">
                 <img
                   src={template.imageUrl || "/placeholder.svg"}
                   alt={template.title}
-                  className="h-full w-full object-contain group-hover:scale-105 transition-transform"
+                  className="h-full w-full object-contain group-hover:scale-110 transition-transform duration-500"
                 />
               </div>
-              <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/60 to-transparent p-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                <div className="w-full text-left">
-                  <p className="text-sm font-semibold text-white">{template.title}</p>
-                  <p className="text-xs text-gray-200">Click to edit</p>
+              <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/70 via-black/30 to-transparent p-4 opacity-0 group-hover:opacity-100 transition-all duration-300">
+                <div className="w-full text-left transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
+                  <p className="text-base font-bold text-white drop-shadow-lg">{template.title}</p>
+                  <p className="text-xs text-gray-200 mt-1 flex items-center gap-1">
+                    <span className="inline-block w-2 h-2 bg-primary rounded-full animate-pulse"></span>
+                    Click to create overlay
+                  </p>
                 </div>
               </div>
             </button>

@@ -22,13 +22,13 @@ const navItems = [
   },
   {
     label: 'Editor',
-    href: '/editor',
+    href: '/dashboard/editor',
     icon: Edit3,
     roles: ['user'],
   },
   {
     label: 'Gallery',
-    href: '/gallery',
+    href: '/dashboard/gallery',
     icon: ImageIcon,
     roles: ['user'],
   },

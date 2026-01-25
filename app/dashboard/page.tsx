@@ -72,7 +72,7 @@ export default function DashboardPage() {
                 <p className="mb-4 text-sm text-muted-foreground">
                   Browse templates and overlay your photos with beautiful designs.
                 </p>
-                <Link href="/editor">
+                <Link href="/dashboard/editor">
                   <Button className="w-full">
                     Start Editing
                     <ArrowRight className="ml-2 h-4 w-4" />
@@ -90,7 +90,7 @@ export default function DashboardPage() {
                 <p className="mb-4 text-sm text-muted-foreground">
                   Browse all the images you have created using templates.
                 </p>
-                <Link href="/gallery">
+                <Link href="/dashboard/gallery">
                   <Button className="w-full">
                     View Gallery
                     <ArrowRight className="ml-2 h-4 w-4" />
