@@ -3,10 +3,12 @@
 import { useRef, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Loader2, Download, AlertCircle, Save } from 'lucide-react';
+import { Loader2, Download, AlertCircle, Save, Type } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import Script from 'next/script';
 import { useToast } from '@/hooks/use-toast';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 declare global {
   interface Window {
@@ -28,6 +30,7 @@ export default function ImageEditor({ template, onClose }: ImageEditorProps) {
   const [error, setError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [customText, setCustomText] = useState('');
   const { toast } = useToast();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -99,6 +102,22 @@ export default function ImageEditor({ template, onClose }: ImageEditorProps) {
           // Draw template on top (top layer with transparency)
           ctx.drawImage(templateImg, 0, 0, canvas.width, canvas.height);
 
+          // Draw custom text if provided
+          if (customText.trim()) {
+            const fontSize = Math.floor(canvas.height * 0.05);
+            ctx.font = `bold ${fontSize}px Inter, system-ui, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            
+            // Text shadow/stroke for readability
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = Math.max(2, fontSize / 15);
+            ctx.strokeText(customText, canvas.width / 2, canvas.height - 20);
+            
+            ctx.fillStyle = 'white';
+            ctx.fillText(customText, canvas.width / 2, canvas.height - 20);
+          }
+
           setIsLoading(false);
         };
 
@@ -126,7 +145,7 @@ export default function ImageEditor({ template, onClose }: ImageEditorProps) {
     if (userImage) {
       mergeImages();
     }
-  }, [userImage, template]);
+  }, [userImage, template, customText]);
 
   const handleSave = async (shouldDownload: boolean) => {
     if (!canvasRef.current || isSaving || isDownloading) return;
@@ -170,6 +189,7 @@ export default function ImageEditor({ template, onClose }: ImageEditorProps) {
       formData.append('file', blob);
       formData.append('templateId', template._id);
       formData.append('userImagePublicId', userImagePublicId);
+      formData.append('customText', customText);
 
       const response = await fetch('/api/images/upload', {
         method: 'POST',
@@ -181,9 +201,8 @@ export default function ImageEditor({ template, onClose }: ImageEditorProps) {
       const data = await response.json();
       
       if (shouldDownload) {
-        const imageResponse = await fetch(data.finalImageUrl);
-        const imageBlob = await imageResponse.blob();
-        const url = window.URL.createObjectURL(imageBlob);
+        // Use the blob directly to avoid extra network requests and potential CORS issues
+        const url = window.URL.createObjectURL(blob);
         
         const a = document.createElement('a');
         a.href = url;
@@ -237,6 +256,32 @@ export default function ImageEditor({ template, onClose }: ImageEditorProps) {
             </p>
           </div>
 
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Your Photo</Label>
+              <Button
+                onClick={handleUploadUserImage}
+                variant="outline"
+                className="w-full bg-transparent hover:bg-primary hover:text-primary-foreground transition-colors"
+              >
+                {userImage ? '✓ Image Selected - Change' : 'Upload Your Photo'}
+              </Button>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="custom-text">Custom Text (Optional)</Label>
+              <div className="relative">
+                <Type className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="custom-text"
+                  placeholder="Enter text here..."
+                  className="pl-9"
+                  value={customText}
+                  onChange={(e) => setCustomText(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
@@ -245,13 +290,6 @@ export default function ImageEditor({ template, onClose }: ImageEditorProps) {
           )}
 
           <div className="flex flex-col sm:flex-row gap-3">
-            <Button
-              onClick={handleUploadUserImage}
-              variant="outline"
-              className="flex-1 bg-transparent hover:bg-primary hover:text-primary-foreground transition-colors"
-            >
-              {userImage ? '✓ Image Selected - Click to Change' : 'Upload Your Photo'}
-            </Button>
             <Button
               onClick={mergeImages}
               disabled={!userImage || isLoading}
@@ -268,11 +306,48 @@ export default function ImageEditor({ template, onClose }: ImageEditorProps) {
             </Button>
           </div>
 
-          <div className="border-2 border-border rounded-xl overflow-auto bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center shadow-inner" style={{ maxHeight: '500px' }}>
-            <canvas
-              ref={canvasRef}
-              className="max-w-full h-auto"
-            />
+          {/* Canvas Preview Area */}
+          <div className={`preview-container ${userImage ? 'has-image' : ''} min-h-[400px] flex items-center justify-center bg-muted/30`}>
+            <div className="preview-glow" />
+            
+            {!userImage ? (
+              <div className="flex flex-col items-center justify-center p-12 text-center space-y-4 animate-in fade-in zoom-in duration-500">
+                <div className="p-4 rounded-full bg-primary/10 text-primary">
+                  <Type className="h-12 w-12" />
+                </div>
+                <div>
+                  <h4 className="text-xl font-semibold">Ready for your photo</h4>
+                  <p className="text-sm text-muted-foreground max-w-[250px]">
+                    Upload a photo to see the merge preview with {template.title}
+                  </p>
+                </div>
+                <Button 
+                  onClick={handleUploadUserImage}
+                  variant="secondary"
+                  size="sm"
+                  className="mt-2"
+                >
+                  Choose Image
+                </Button>
+              </div>
+            ) : (
+              <div className="relative w-full h-full flex items-center justify-center p-4">
+                {isLoading && (
+                  <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/50 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="flex flex-col items-center space-y-2">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                      <p className="text-xs font-medium text-muted-foreground">Merging styles...</p>
+                    </div>
+                  </div>
+                )}
+                <div className="transparency-grid rounded-lg shadow-2xl overflow-hidden ring-1 ring-border">
+                  <canvas
+                    ref={canvasRef}
+                    className="max-w-full h-auto block"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3 pt-2">

@@ -137,6 +137,11 @@ export default function GalleryPage() {
                     <p className="font-semibold text-foreground truncate">
                       {image.templateId?.title || 'Custom Image'}
                     </p>
+                    {image.customText && (
+                      <p className="text-xs text-primary font-medium truncate">
+                        "{image.customText}"
+                      </p>
+                    )}
                     <p className="text-xs text-muted-foreground">
                       {new Date(image.createdAt).toLocaleDateString('en-US', {
                         year: 'numeric',
@@ -207,6 +212,11 @@ export default function GalleryPage() {
                         <h3 className="text-xl font-bold text-foreground">
                           {viewImage.templateId?.title || 'Custom Image'}
                         </h3>
+                        {viewImage.customText && (
+                          <p className="text-sm font-medium text-primary italic">
+                            "{viewImage.customText}"
+                          </p>
+                        )}
                         <p className="text-sm text-muted-foreground">
                           Created on {new Date(viewImage.createdAt).toLocaleDateString('en-US', {
                             year: 'numeric',

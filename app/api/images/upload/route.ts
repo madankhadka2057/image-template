@@ -14,6 +14,7 @@ export async function POST(request: NextRequest) {
     const file = formData.get('file') as Blob;
     const templateId = formData.get('templateId') as string;
     const userImagePublicId = formData.get('userImagePublicId') as string;
+    const customText = formData.get('customText') as string;
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
@@ -64,6 +65,7 @@ export async function POST(request: NextRequest) {
       finalImagePublicId,
       templateId,
       userImagePublicId,
+      customText,
     });
 
     return NextResponse.json(generatedImage, { status: 201 });

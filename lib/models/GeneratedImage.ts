@@ -24,6 +24,10 @@ const generatedImageSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    customText: {
+      type: String,
+      required: false,
+    },
   },
   { timestamps: true }
 );
