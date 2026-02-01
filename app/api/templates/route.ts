@@ -5,8 +5,11 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET() {
   try {
-    await connectDB();
-    const templates = await Template.find().populate('createdBy', 'name email');
+    const res = await fetch('https://mdnkhadka.app.n8n.cloud/webhook/templates');
+    if (!res.ok) {
+      throw new Error('Failed to fetch templates from webhook');
+    }
+    const templates = await res.json();
     return NextResponse.json(templates);
   } catch (error) {
     console.error('Get templates error:', error);

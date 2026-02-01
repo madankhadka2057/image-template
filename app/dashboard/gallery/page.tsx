@@ -114,7 +114,7 @@ export default function GalleryPage() {
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {images.map((image: any) => (
               <Card key={image._id} className="group overflow-hidden hover:shadow-xl transition-all duration-300 border-2 hover:border-primary/50">
-                <div className="relative aspect-square w-full bg-gradient-to-br from-muted to-muted/50 overflow-hidden">
+                <div className="relative aspect-square w-full bg-linear-to-br from-muted to-muted/50 overflow-hidden">
                   <img
                     src={image.finalImageUrl || "/placeholder.svg"}
                     alt="Gallery item"
@@ -135,7 +135,7 @@ export default function GalleryPage() {
                 <CardContent className="pt-4 space-y-3">
                   <div className="text-sm space-y-1">
                     <p className="font-semibold text-foreground truncate">
-                      {image.templateId?.title || 'Custom Image'}
+                      {image.templateId?.title || image.templateTitle || 'Custom Image'}
                     </p>
                     {image.customText && (
                       <p className="text-xs text-primary font-medium truncate">
@@ -158,7 +158,7 @@ export default function GalleryPage() {
                       onClick={() =>
                         handleDownload(
                           image.finalImageUrl,
-                          image.templateId?.title || 'image',
+                          image.templateId?.title || image.templateTitle || 'image',
                           image._id
                         )
                       }
@@ -210,7 +210,7 @@ export default function GalleryPage() {
                     <div className="bg-card p-6 space-y-4">
                       <div>
                         <h3 className="text-xl font-bold text-foreground">
-                          {viewImage.templateId?.title || 'Custom Image'}
+                          {viewImage.templateId?.title || viewImage.templateTitle || 'Custom Image'}
                         </h3>
                         {viewImage.customText && (
                           <p className="text-sm font-medium text-primary italic">
@@ -233,7 +233,7 @@ export default function GalleryPage() {
                           onClick={() =>
                             handleDownload(
                               viewImage.finalImageUrl,
-                              viewImage.templateId?.title || 'image',
+                              viewImage.templateId?.title || viewImage.templateTitle || 'image',
                               viewImage._id
                             )
                           }

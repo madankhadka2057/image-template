@@ -1,11 +1,18 @@
 import mongoose from 'mongoose';
 
+const MODEL_NAME = 'GeneratedImage';
+
 const generatedImageSchema = new mongoose.Schema(
   {
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
+    },
+    source: {
+      type: String,
+      enum: ['overlay', 'canva'],
+      default: 'overlay',
     },
     finalImageUrl: {
       type: String,
@@ -18,11 +25,19 @@ const generatedImageSchema = new mongoose.Schema(
     templateId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Template',
-      required: true,
+      required: false,
+    },
+    templateExternalId: {
+      type: String,
+      required: false,
+    },
+    templateTitle: {
+      type: String,
+      required: false,
     },
     userImagePublicId: {
       type: String,
-      required: true,
+      required: false,
     },
     customText: {
       type: String,
@@ -32,6 +47,9 @@ const generatedImageSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+if (process.env.NODE_ENV !== 'production' && mongoose.models[MODEL_NAME]) {
+  delete mongoose.models[MODEL_NAME];
+}
+
 export const GeneratedImage =
-  mongoose.models.GeneratedImage ||
-  mongoose.model('GeneratedImage', generatedImageSchema);
+  mongoose.models[MODEL_NAME] || mongoose.model(MODEL_NAME, generatedImageSchema);

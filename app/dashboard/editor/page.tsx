@@ -1,16 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent } from '@/components/ui/card';
-import ImageEditor from '@/components/ImageEditor';
 
 export default function EditorPage() {
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
 
   useEffect(() => {
     const fetchTemplates = async () => {
@@ -19,40 +18,22 @@ export default function EditorPage() {
         const response = await fetch('/api/templates');
         if (!response.ok) throw new Error('Failed to fetch templates');
         const data = await response.json();
-        setTemplates(data);
+        setTemplates(data.items || data);
       } catch (err) {
         setError('Failed to load templates');
       } finally {
         setLoading(false);
       }
     };
-
     fetchTemplates();
   }, []);
-
-  if (selectedTemplate) {
-    return (
-      <div className="space-y-4">
-        <button
-          onClick={() => setSelectedTemplate(null)}
-          className="text-primary hover:underline text-sm"
-        >
-          ← Back to Templates
-        </button>
-        <ImageEditor
-          template={selectedTemplate}
-          onClose={() => setSelectedTemplate(null)}
-        />
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold text-foreground">Create Overlay</h1>
         <p className="mt-2 text-muted-foreground">
-          Select a template and upload your photo to create a beautiful overlay
+          Select a template to open the editor
         </p>
       </div>
 
@@ -78,30 +59,36 @@ export default function EditorPage() {
         </Card>
       ) : (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {templates.map((template: any) => (
-            <button
-              key={template._id}
-              onClick={() => setSelectedTemplate(template)}
+          {templates.map((template: any, index: number) => {
+            const templateId =
+              template?.id ?? template?._id ?? template?.template_id ?? template?.templateId;
+            if (!templateId) return null;
+
+            return (
+            <Link
+              key={`${String(templateId)}-${index}`}
+              href={`/dashboard/editor/${encodeURIComponent(String(templateId))}`}
               className="group relative overflow-hidden rounded-xl border-2 border-border hover:border-primary/50 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1"
             >
-              <div className="aspect-square w-full bg-gradient-to-br from-muted to-muted/50">
+              <div className="aspect-square w-full bg-linear-to-br from-muted to-muted/50">
                 <img
-                  src={template.imageUrl || "/placeholder.svg"}
+                  src={template.thumbnail?.url || "/placeholder.svg"}
                   alt={template.title}
                   className="h-full w-full object-contain group-hover:scale-110 transition-transform duration-500"
                 />
               </div>
-              <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/70 via-black/30 to-transparent p-4 opacity-0 group-hover:opacity-100 transition-all duration-300">
+              <div className="absolute inset-0 flex items-end bg-linear-to-t from-black/70 via-black/30 to-transparent p-4 opacity-0 group-hover:opacity-100 transition-all duration-300">
                 <div className="w-full text-left transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
                   <p className="text-base font-bold text-white drop-shadow-lg">{template.title}</p>
                   <p className="text-xs text-gray-200 mt-1 flex items-center gap-1">
                     <span className="inline-block w-2 h-2 bg-primary rounded-full animate-pulse"></span>
-                    Click to create overlay
+                    Open editor
                   </p>
                 </div>
               </div>
-            </button>
-          ))}
+            </Link>
+            );
+          })}
         </div>
       )}
     </div>

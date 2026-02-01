@@ -15,6 +15,15 @@ const templateSchema = new mongoose.Schema(
       required: true,
       unique: true,
     },
+    placeholder: {
+      x: { type: Number, default: 0 },
+      y: { type: Number, default: 0 },
+      width: { type: Number, default: 500 },
+      height: { type: Number, default: 500 },
+    },
+    canvaBrandTemplateId: {
+      type: String,
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

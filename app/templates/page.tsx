@@ -18,12 +18,9 @@ export default function TemplatesPage() {
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [modalOpen, setModalOpen] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState(null);
-  const [deleting, setDeleting] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Redirect if not admin
+  // Redirect if not admin (optional, keep or remove as needed)
   useEffect(() => {
     if (session && (session.user as any).role !== 'admin') {
       router.push('/dashboard');
@@ -48,63 +45,18 @@ export default function TemplatesPage() {
     fetchTemplates();
   }, []);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this template?')) return;
-
-    setDeleting(id);
-    try {
-      const response = await fetch(`/api/templates/${id}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) throw new Error('Failed to delete template');
-      setTemplates(templates.filter((t: any) => t._id !== id));
-      toast({
-        title: "Deleted",
-        description: "Template deleted successfully",
-      });
-    } catch (err) {
-      setError('Failed to delete template');
-      toast({
-        title: "Error",
-        description: "Failed to delete template",
-        variant: "destructive",
-      });
-    } finally {
-      setDeleting(null);
-    }
-  };
-
-  const handleOpenModal = (template?: any) => {
-    setSelectedTemplate(template || null);
-    setModalOpen(true);
-  };
-
-  const handleCloseModal = () => {
-    setModalOpen(false);
-    setSelectedTemplate(null);
-  };
+  // No edit/delete/modal actions for webhook data
 
   return (
     <>
-      <Script
-        src="https://widget.cloudinary.com/v2.0/global/all.js"
-        type="text/javascript"
-        strategy="afterInteractive"
-      />
-
       <div className="space-y-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Template Management</h1>
+            <h1 className="text-3xl font-bold text-foreground">Templates Gallery</h1>
             <p className="mt-2 text-muted-foreground">
-              Create and manage PNG templates for users
+              Browse Canva templates fetched from the webhook
             </p>
           </div>
-          <Button onClick={() => handleOpenModal()} size="lg">
-            <Plus className="mr-2 h-4 w-4" />
-            New Template
-          </Button>
         </div>
 
         {error && (
@@ -125,19 +77,15 @@ export default function TemplatesPage() {
           <Card>
             <CardContent className="py-12 text-center">
               <p className="text-muted-foreground mb-4">No templates yet</p>
-              <Button onClick={() => handleOpenModal()}>
-                <Plus className="mr-2 h-4 w-4" />
-                Create Your First Template
-              </Button>
             </CardContent>
           </Card>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {templates.map((template: any) => (
-              <Card key={template._id} className="overflow-hidden hover:shadow-lg transition-shadow">
+              <Card key={template.id} className="overflow-hidden hover:shadow-lg transition-shadow">
                 <div className="aspect-square w-full bg-muted">
                   <img
-                    src={template.imageUrl || "/placeholder.svg"}
+                    src={template.thumbnail?.url || "/placeholder.svg"}
                     alt={template.title}
                     className="h-full w-full object-contain"
                   />
@@ -145,30 +93,21 @@ export default function TemplatesPage() {
                 <CardHeader>
                   <CardTitle className="text-lg">{template.title}</CardTitle>
                   <CardDescription className="text-xs">
-                    {new Date(template.createdAt).toLocaleDateString()}
+                    {template.created_at ? new Date(template.created_at * 1000).toLocaleDateString() : ''}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 bg-transparent"
-                      onClick={() => handleOpenModal(template)}
-                    >
-                      <Edit2 className="mr-2 h-4 w-4" />
-                      Edit
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => handleDelete(template._id)}
-                      disabled={deleting === template._id}
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      {deleting === template._id ? 'Deleting...' : 'Delete'}
-                    </Button>
+                    <a href={template.view_url} target="_blank" rel="noopener noreferrer" className="flex-1">
+                      <Button variant="outline" size="sm" className="w-full">
+                        View
+                      </Button>
+                    </a>
+                    <a href={template.create_url} target="_blank" rel="noopener noreferrer" className="flex-1">
+                      <Button variant="default" size="sm" className="w-full">
+                        Create
+                      </Button>
+                    </a>
                   </div>
                 </CardContent>
               </Card>
@@ -176,13 +115,6 @@ export default function TemplatesPage() {
           </div>
         )}
       </div>
-
-      <TemplateModal
-        open={modalOpen}
-        onOpenChange={handleCloseModal}
-        template={selectedTemplate}
-        onSuccess={fetchTemplates}
-      />
     </>
   );
 }

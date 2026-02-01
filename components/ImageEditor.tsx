@@ -1,394 +1,419 @@
 'use client';
 
-import { useRef, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Loader2, Download, AlertCircle, Save, Type } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import Script from 'next/script';
-import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Loader2 } from 'lucide-react';
 
-declare global {
-  interface Window {
-    cloudinary: any;
+function isRemoteUrl(url: string) {
+  return /^https?:\/\//i.test(url);
+}
+
+function extractFirstJobUrl(jsonData: any): string | null {
+  const direct = jsonData?.job?.urls?.[0];
+  if (typeof direct === 'string' && direct.length > 0) return direct;
+
+  if (Array.isArray(jsonData)) {
+    const found = jsonData
+      .map((item: any) => item?.job?.urls?.[0])
+      .find((u: any) => typeof u === 'string' && u.length > 0);
+    if (typeof found === 'string' && found.length > 0) return found;
   }
+
+  const fallback =
+    jsonData?.imageUrl ||
+    jsonData?.image_url ||
+    jsonData?.url ||
+    jsonData?.resultUrl ||
+    jsonData?.result_url;
+  if (typeof fallback === 'string' && fallback.length > 0) return fallback;
+
+  return null;
 }
 
 interface ImageEditorProps {
   template: any;
   onClose: () => void;
 }
-
 export default function ImageEditor({ template, onClose }: ImageEditorProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [userImage, setUserImage] = useState<string | null>(null);
-  const [userImageFile, setUserImageFile] = useState<File | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [fields, setFields] = useState<any>(null);
+  const [form, setForm] = useState<any>({});
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [customText, setCustomText] = useState('');
-  const { toast } = useToast();
+  const [success, setSuccess] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [resultImageUrl, setResultImageUrl] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [savingToCloudinary, setSavingToCloudinary] = useState(false);
+  const [cloudinaryUrl, setCloudinaryUrl] = useState<string | null>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  useEffect(() => {
+    return () => {
+      if (resultImageUrl?.startsWith('blob:')) {
+        URL.revokeObjectURL(resultImageUrl);
+      }
+    };
+  }, [resultImageUrl]);
+
+  useEffect(() => {
+    const fetchFields = async () => {
+      setLoading(true);
+      setError('');
+      setSuccess('');
+      setResultImageUrl(null);
+      setCloudinaryUrl(null);
+      try {
+        const res = await fetch(
+          `https://mdnkhadka.app.n8n.cloud/webhook/template-dataset?template_id=${template.id}`
+        );
+        if (!res.ok) throw new Error('Failed to fetch template fields');
+        const data = await res.json();
+        setFields(data.dataset);
+      } catch (err: any) {
+        setError(err.message || 'Failed to load fields');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchFields();
+  }, [template]);
+
+  const handleInputChange = (key: string, value: any) => {
+    setForm((prev: any) => ({ ...prev, [key]: value }));
+  };
+
+  const handleFileChange = (key: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setUserImageFile(file);
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setUserImage(event.target?.result as string);
-        setError('');
-      };
-      reader.readAsDataURL(file);
+      handleInputChange(key, file);
     }
   };
 
-  const handleUploadUserImage = () => {
-    fileInputRef.current?.click();
-  };
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-  const mergeImages = async () => {
-    if (!userImage) {
-      setError('Please upload a user image first');
+    setError('');
+    setSuccess('');
+
+    if (!fields) {
+      setError('Fields not loaded yet');
       return;
     }
 
-    setIsLoading(true);
-    setError('');
+    const missing = Object.keys(fields).filter((key) => {
+      const value = form[key];
+      if (value === undefined || value === null) return true;
+      if (typeof value === 'string' && value.trim() === '') return true;
+      return false;
+    });
 
+    if (missing.length > 0) {
+      setError(`Please fill: ${missing.join(', ')}`);
+      return;
+    }
+
+    setSubmitting(true);
     try {
-      const canvas = canvasRef.current;
-      if (!canvas) throw new Error('Canvas not available');
+      const payload = new FormData();
+      payload.append('template_id', template.id);
+      payload.append('templateId', template.id);
+      payload.append('template_title', template.title || '');
 
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('2D context not available');
+      let hasAnyImage = false;
 
-      // Create image objects
-      const userImg = new Image();
-      const templateImg = new Image();
+      for (const [key, config] of Object.entries(fields)) {
+        const value = form[key];
+        if ((config as any)?.type === 'image') {
+          hasAnyImage = true;
+          payload.append(key, value as File);
+          payload.append(`${key}_isImage`, 'true');
+        } else {
+          payload.append(key, String(value));
+        }
+      }
 
-      userImg.crossOrigin = 'anonymous';
-      templateImg.crossOrigin = 'anonymous';
+      if (hasAnyImage) {
+        payload.append('isImage', 'true');
+      }
 
-      userImg.onload = () => {
-        templateImg.onload = () => {
-          // Set canvas size to template dimensions
-          canvas.width = templateImg.width;
-          canvas.height = templateImg.height;
+      const res = await fetch('/api/canva/create-template', {
+        method: 'POST',
+        body: payload,
+      });
 
-          // Draw user image first (bottom layer)
-          const userAspect = userImg.width / userImg.height;
-          const canvasAspect = canvas.width / canvas.height;
+      const contentType = res.headers.get('content-type') || '';
 
-          let drawWidth, drawHeight, drawX, drawY;
+      // If upstream ever returns a real image payload, handle it.
+      if (contentType.startsWith('image/')) {
+        if (!res.ok) throw new Error('Failed to submit data');
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        setResultImageUrl(url);
+        setSuccess('Image created successfully.');
+        return;
+      }
 
-          if (userAspect > canvasAspect) {
-            drawHeight = canvas.height;
-            drawWidth = canvas.height * userAspect;
-            drawX = (canvas.width - drawWidth) / 2;
-            drawY = 0;
-          } else {
-            drawWidth = canvas.width;
-            drawHeight = canvas.width / userAspect;
-            drawX = 0;
-            drawY = (canvas.height - drawHeight) / 2;
-          }
+      // Otherwise treat response as JSON (your webhook returns JSON with job.urls)
+      let jsonData: any = null;
+      try {
+        jsonData = await res.json();
+      } catch {
+        jsonData = null;
+      }
 
-          ctx.drawImage(userImg, drawX, drawY, drawWidth, drawHeight);
+      if (!res.ok) {
+        const message =
+          jsonData?.error ||
+          jsonData?.message ||
+          'Failed to submit data';
+        throw new Error(message);
+      }
 
-          // Draw template on top (top layer with transparency)
-          ctx.drawImage(templateImg, 0, 0, canvas.width, canvas.height);
+      console.log('Webhook response JSON:', jsonData);
 
-          // Draw custom text if provided
-          if (customText.trim()) {
-            const fontSize = Math.floor(canvas.height * 0.05);
-            ctx.font = `bold ${fontSize}px Inter, system-ui, sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'bottom';
-            
-            // Text shadow/stroke for readability
-            ctx.strokeStyle = 'black';
-            ctx.lineWidth = Math.max(2, fontSize / 15);
-            ctx.strokeText(customText, canvas.width / 2, canvas.height - 20);
-            
-            ctx.fillStyle = 'white';
-            ctx.fillText(customText, canvas.width / 2, canvas.height - 20);
-          }
+      const urlFromJob = extractFirstJobUrl(jsonData);
+      if (urlFromJob) {
+        setResultImageUrl(urlFromJob);
+        setSuccess('Image created successfully.');
+        return;
+      }
 
-          setIsLoading(false);
-        };
+      const base64 = jsonData?.imageBase64 || jsonData?.image_base64;
+      const mime = jsonData?.mimeType || jsonData?.mime_type || 'image/png';
+      if (typeof base64 === 'string' && base64.length > 0) {
+        setResultImageUrl(`data:${mime};base64,${base64}`);
+        setSuccess('Image created successfully.');
+        return;
+      }
 
-        templateImg.src = template.imageUrl;
-      };
-
-      userImg.onerror = () => {
-        setError('Failed to load user image');
-        setIsLoading(false);
-      };
-
-      templateImg.onerror = () => {
-        setError('Failed to load template image');
-        setIsLoading(false);
-      };
-
-      userImg.src = userImage;
-    } catch (err) {
-      setError('Failed to merge images');
-      setIsLoading(false);
+      setSuccess('Submitted successfully, but no image URL returned.');
+    } catch (err: any) {
+      setError(err.message || 'Failed to submit data');
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  useEffect(() => {
-    if (userImage) {
-      mergeImages();
-    }
-  }, [userImage, template, customText]);
+  const handleDownload = async () => {
+    if (!resultImageUrl || downloading) return;
 
-  const handleSave = async (shouldDownload: boolean) => {
-    if (!canvasRef.current || isSaving || isDownloading) return;
-
-    if (shouldDownload) setIsDownloading(true);
-    else setIsSaving(true);
-    
-    setError('');
-
+    setDownloading(true);
     try {
-      if (!userImageFile) throw new Error('No user image selected');
+      const filename = `canva-export-${template?.id || Date.now()}.png`;
 
-      // 1. Upload user image to Cloudinary first
-      const userFormData = new FormData();
-      userFormData.append('file', userImageFile);
-      userFormData.append('upload_preset', process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || '');
-      userFormData.append('folder', 'user-images');
-
-      const userUploadResponse = await fetch(
-        `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`,
-        {
-          method: 'POST',
-          body: userFormData,
-        }
-      );
-
-      if (!userUploadResponse.ok) throw new Error('Failed to upload user photo');
-      const userData = await userUploadResponse.json();
-      const userImagePublicId = userData.public_id;
-
-      // 2. Create blob of merged image
-      const canvas = canvasRef.current;
-      const blob = await new Promise<Blob | null>((resolve) => 
-        canvas.toBlob(resolve, 'image/png')
-      );
-
-      if (!blob) throw new Error('Failed to create merged image blob');
-
-      // 3. Upload final merged image and save to DB
-      const formData = new FormData();
-      formData.append('file', blob);
-      formData.append('templateId', template._id);
-      formData.append('userImagePublicId', userImagePublicId);
-      formData.append('customText', customText);
-
-      const response = await fetch('/api/images/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) throw new Error('Failed to save to gallery');
-
-      const data = await response.json();
-      
-      if (shouldDownload) {
-        // Use the blob directly to avoid extra network requests and potential CORS issues
-        const url = window.URL.createObjectURL(blob);
-        
+      // If already a blob/data url, the browser can download directly.
+      if (resultImageUrl.startsWith('blob:') || resultImageUrl.startsWith('data:')) {
         const a = document.createElement('a');
-        a.href = url;
-        a.download = `overlay-${Date.now()}.png`;
+        a.href = resultImageUrl;
+        a.download = filename;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-        
-        toast({
-          title: "Success!",
-          description: "Image saved to gallery and downloaded.",
+        return;
+      }
+
+      // Remote URL: try fetching as blob then downloading.
+      const resp = await fetch(resultImageUrl);
+      if (!resp.ok) throw new Error('Failed to download image');
+      const blob = await resp.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      // Some signed URLs can block fetch due to CORS; fallback to opening the image.
+      window.open(resultImageUrl, '_blank', 'noopener,noreferrer');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const handleSaveToCloudinary = async () => {
+    if (!resultImageUrl || savingToCloudinary) return;
+
+    setError('');
+    setSuccess('');
+    setSavingToCloudinary(true);
+
+    try {
+      // Save via server: uploads to Cloudinary AND inserts into MongoDB.
+      // Prefer JSON for remote URLs; fall back to multipart for blob/data URLs.
+      let res: Response;
+
+      if (isRemoteUrl(resultImageUrl)) {
+        res = await fetch('/api/images/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageUrl: resultImageUrl,
+            templateId: template?.id,
+            templateTitle: template?.title,
+          }),
         });
       } else {
-        toast({
-          title: "Saved!",
-          description: "Image saved to your gallery.",
+        const blob = await fetch(resultImageUrl).then((r) => r.blob());
+        const fd = new FormData();
+        fd.append('file', blob, `canva-export-${template?.id || Date.now()}.png`);
+        fd.append('templateId', template?.id || '');
+        fd.append('templateTitle', template?.title || '');
+
+        res = await fetch('/api/images/save', {
+          method: 'POST',
+          body: fd,
         });
       }
 
-      onClose();
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(json?.error || 'Failed to save image');
+      }
+
+      const savedUrl = json?.url || json?.image?.finalImageUrl;
+      if (typeof savedUrl === 'string' && savedUrl.length > 0) {
+        setCloudinaryUrl(savedUrl);
+        setSuccess('Saved to Cloudinary successfully.');
+      } else {
+        setSuccess('Saved, but no URL returned.');
+      }
     } catch (err: any) {
-      setError(err.message || 'Failed to save image');
-      toast({
-        title: "Error",
-        description: err.message || "Failed to save image. Please try again.",
-        variant: "destructive",
-      });
+      setError(err.message || 'Failed to save to Cloudinary');
     } finally {
-      setIsSaving(false);
-      setIsDownloading(false);
+      setSavingToCloudinary(false);
     }
   };
 
   return (
-    <>
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleFileChange}
-        accept="image/*"
-        className="hidden"
-      />
-
-      <Card className="shadow-lg border-2">
-        <CardContent className="pt-6 space-y-6">
-          <div className="space-y-2">
-            <h3 className="text-2xl font-bold text-foreground">{template.title}</h3>
-            <p className="text-sm text-muted-foreground">
-              Upload your photo and it will be overlaid with this template
-            </p>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Your Photo</Label>
-              <Button
-                onClick={handleUploadUserImage}
-                variant="outline"
-                className="w-full bg-transparent hover:bg-primary hover:text-primary-foreground transition-colors"
+    <Card className="shadow-lg border-2 max-w-3xl mx-auto">
+      <CardContent className="pt-6 space-y-6">
+        <div className="space-y-2">
+          <h3 className="text-2xl font-bold text-foreground">{template.title}</h3>
+          <p className="text-sm text-muted-foreground">
+            Fill the fields below to use this template (powered by Canva Autofill)
+          </p>
+        </div>
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        {success && (
+          <Alert>
+            <AlertDescription>{success}</AlertDescription>
+          </Alert>
+        )}
+        {submitting && (
+          <Alert>
+            <AlertDescription>Please wait up to 25 seconds…</AlertDescription>
+          </Alert>
+        )}
+        {cloudinaryUrl && (
+          <Alert>
+            <AlertDescription>
+              Saved to Cloudinary:{' '}
+              <a
+                className="underline"
+                href={cloudinaryUrl}
+                target="_blank"
+                rel="noopener noreferrer"
               >
-                {userImage ? '✓ Image Selected - Change' : 'Upload Your Photo'}
-              </Button>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="custom-text">Custom Text (Optional)</Label>
-              <div className="relative">
-                <Type className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="custom-text"
-                  placeholder="Enter text here..."
-                  className="pl-9"
-                  value={customText}
-                  onChange={(e) => setCustomText(e.target.value)}
-                />
-              </div>
-            </div>
+                Open
+              </a>
+            </AlertDescription>
+          </Alert>
+        )}
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin mr-2" /> Loading fields...
           </div>
-
-          {error && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Button
-              onClick={mergeImages}
-              disabled={!userImage || isLoading}
-              className="flex-1"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Merging...
-                </>
-              ) : (
-                'Preview Merge'
-              )}
-            </Button>
-          </div>
-
-          {/* Canvas Preview Area */}
-          <div className={`preview-container ${userImage ? 'has-image' : ''} min-h-[400px] flex items-center justify-center bg-muted/30`}>
-            <div className="preview-glow" />
-            
-            {!userImage ? (
-              <div className="flex flex-col items-center justify-center p-12 text-center space-y-4 animate-in fade-in zoom-in duration-500">
-                <div className="p-4 rounded-full bg-primary/10 text-primary">
-                  <Type className="h-12 w-12" />
-                </div>
-                <div>
-                  <h4 className="text-xl font-semibold">Ready for your photo</h4>
-                  <p className="text-sm text-muted-foreground max-w-[250px]">
-                    Upload a photo to see the merge preview with {template.title}
-                  </p>
-                </div>
-                <Button 
-                  onClick={handleUploadUserImage}
-                  variant="secondary"
-                  size="sm"
-                  className="mt-2"
-                >
-                  Choose Image
+        ) : resultImageUrl ? (
+          <div className="space-y-4">
+            <div className="rounded-lg border bg-muted/20 p-3">
+              <img
+                src={resultImageUrl}
+                alt="Generated result"
+                className="w-full h-auto rounded-md object-contain"
+              />
+            </div>
+            <div className="flex gap-2">
+              <a
+                href={resultImageUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1"
+              >
+                <Button type="button" className="w-full" variant="secondary">
+                  Open Image
                 </Button>
-              </div>
-            ) : (
-              <div className="relative w-full h-full flex items-center justify-center p-4">
-                {isLoading && (
-                  <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/50 backdrop-blur-sm animate-in fade-in duration-300">
-                    <div className="flex flex-col items-center space-y-2">
-                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                      <p className="text-xs font-medium text-muted-foreground">Merging styles...</p>
-                    </div>
-                  </div>
-                )}
-                <div className="transparency-grid rounded-lg shadow-2xl overflow-hidden ring-1 ring-border">
-                  <canvas
-                    ref={canvasRef}
-                    className="max-w-full h-auto block"
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-3 pt-2">
-            <Button
-              variant="outline"
-              className="sm:w-auto w-full bg-transparent"
-              onClick={onClose}
-              disabled={isSaving || isDownloading}
-            >
-              Cancel
-            </Button>
-            <div className="flex flex-1 gap-3">
+              </a>
               <Button
-                onClick={() => handleSave(false)}
-                disabled={!userImage || isLoading || isSaving || isDownloading}
-                variant="secondary"
+                type="button"
                 className="flex-1"
+                variant="secondary"
+                onClick={handleSaveToCloudinary}
+                disabled={savingToCloudinary}
               >
-                {isSaving ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="mr-2 h-4 w-4" />
-                )}
-                Save Only
+                {savingToCloudinary ? 'Saving...' : 'Save'}
               </Button>
               <Button
-                onClick={() => handleSave(true)}
-                disabled={!userImage || isLoading || isSaving || isDownloading}
+                type="button"
                 className="flex-1"
+                variant="secondary"
+                onClick={handleDownload}
+                disabled={downloading}
               >
-                {isDownloading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Download className="mr-2 h-4 w-4" />
-                )}
-                Download
+                {downloading ? 'Downloading...' : 'Download'}
+              </Button>
+              <Button type="button" className="flex-1" onClick={onClose}>
+                Close
               </Button>
             </div>
           </div>
-        </CardContent>
-      </Card>
-    </>
+        ) : fields ? (
+          <form className="space-y-4" onSubmit={handleSubmit}>
+            <Alert variant="destructive">
+              <AlertDescription>
+                Please use background removed PNG image for better results when uploading images.
+              </AlertDescription>
+            </Alert>
+            {Object.entries(fields).map(([key, value]: any) => (
+              <div key={key} className="space-y-1">
+                <Label htmlFor={key}>{key.charAt(0).toUpperCase() + key.slice(1)}</Label>
+                {value.type === 'text' ? (
+                  <Input
+                    id={key}
+                    value={form[key] || ''}
+                    onChange={e => handleInputChange(key, e.target.value)}
+                    required
+                  />
+                ) : value.type === 'image' ? (
+                  <Input
+                    id={key}
+                    type="file"
+                    accept="image/*"
+                    onChange={e => handleFileChange(key, e)}
+                    required
+                  />
+                ) : null}
+              </div>
+            ))}
+            <div className="flex gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>Cancel</Button>
+              <Button type="submit" disabled={submitting} className="flex-1">
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                {submitting ? 'Submitting...' : 'Submit'}
+              </Button>
+            </div>
+          </form>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }

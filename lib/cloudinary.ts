@@ -35,3 +35,23 @@ export const deleteFromCloudinary = async (publicId: string): Promise<void> => {
     throw new Error('Delete failed');
   }
 };
+
+export const generateAutofillUrl = (
+  templatePublicId: string,
+  userPublicId: string,
+  placeholder: { x: number; y: number; width: number; height: number }
+) => {
+  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+
+  // Transformation logic:
+  // 1. Take the user image
+  // 2. Crop/Fill it to the placeholder size
+  // 3. Overlay it onto the template at (x, y)
+  // Note: Cloudinary coordinates for overlays are usually relative to center unless specified.
+  // Using 'fl_layer_apply,g_north_west' for top-left positioning.
+
+  return `https://res.cloudinary.com/${cloudName}/image/upload/` +
+    `u_${userPublicId.replace(/\//g, ':')},w_${placeholder.width},h_${placeholder.height},c_fill,g_center/` +
+    `fl_layer_apply,g_north_west,x_${placeholder.x},y_${placeholder.y}/` +
+    `${templatePublicId}`;
+};
