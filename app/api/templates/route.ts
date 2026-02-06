@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET() {
   try {
-    const res = await fetch('https://mdnkhadka.app.n8n.cloud/webhook/templates');
+    const res = await fetch(`${process.env.NEXT_PUBLIC_CANVA_BASE_URL}/webhook/templates`);
     if (!res.ok) {
       throw new Error('Failed to fetch templates from webhook');
     }

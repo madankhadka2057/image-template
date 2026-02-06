@@ -13,14 +13,14 @@ export async function POST(request: NextRequest) {
       for (const [key, value] of incoming.entries()) {
         outgoing.append(key, value as any);
       }
-
-      upstreamResponse = await fetch('https://mdnkhadka.app.n8n.cloud/webhook/create-template', {
+      console.log(process.env.NEXT_PUBLIC_CANVA_BASE_URL)
+      upstreamResponse = await fetch(`${process.env.NEXT_PUBLIC_CANVA_BASE_URL}/webhook/create-template`, {
         method: 'POST',
         body: outgoing,
       });
     } else {
       const jsonBody = await request.json().catch(() => ({}));
-      upstreamResponse = await fetch('https://mdnkhadka.app.n8n.cloud/webhook/create-template', {
+      upstreamResponse = await fetch(`${process.env.NEXT_PUBLIC_CANVA_BASE_URL}/webhook/create-template`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

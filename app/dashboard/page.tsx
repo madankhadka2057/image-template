@@ -114,26 +114,6 @@ export default function DashboardPage() {
             </Card>
           </>
         )}
-        <Card className="hover:shadow-lg transition-shadow border-blue-100 bg-blue-50/10">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <span className="p-1 px-2 rounded bg-blue-600 text-white text-[10px] font-bold uppercase">Canva</span>
-              Canva Integration
-            </CardTitle>
-            <CardDescription>Link your Canva account for professional autofill</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="mb-4 text-sm text-muted-foreground">
-              Connect your Canva account to use official brand templates for high-quality overlays.
-            </p>
-            <Link href="/api/canva/auth">
-              <Button variant="outline" className="w-full border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white">
-                Connect Canva account
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

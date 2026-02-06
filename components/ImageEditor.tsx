@@ -67,7 +67,7 @@ export default function ImageEditor({ template, onClose }: ImageEditorProps) {
       setCloudinaryUrl(null);
       try {
         const res = await fetch(
-          `https://mdnkhadka.app.n8n.cloud/webhook/template-dataset?template_id=${template.id}`
+          `${process.env.NEXT_PUBLIC_CANVA_BASE_URL}/webhook/template-dataset?template_id=${template.id}`
         );
         if (!res.ok) throw new Error('Failed to fetch template fields');
         const data = await res.json();
@@ -129,7 +129,7 @@ export default function ImageEditor({ template, onClose }: ImageEditorProps) {
         if ((config as any)?.type === 'image') {
           hasAnyImage = true;
           payload.append(key, value as File);
-          payload.append(`${key}_isImage`, 'true');
+          payload.append(`${key}`, 'true');
         } else {
           payload.append(key, String(value));
         }

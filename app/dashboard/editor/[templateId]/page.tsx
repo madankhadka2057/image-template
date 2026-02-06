@@ -21,7 +21,7 @@ export default async function EditorTemplatePage({
     }
 
     const upstream = await fetch(
-      `https://mdnkhadka.app.n8n.cloud/webhook/template?template_id=${encodeURIComponent(templateId)}`,
+      `${process.env.NEXT_PUBLIC_CANVA_BASE_URL}/webhook/template?template_id=${encodeURIComponent(templateId)}`,
       { cache: 'no-store' }
     );
 
